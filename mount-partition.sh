@@ -38,7 +38,7 @@ mount-partition()
 	1)  list-partitions "$@" ;;
 	2)  attach-partition "$@" ;;
 	3)  mount-partition "$@" ;;
-	*)  usage ;;
+	*)  mount-partition-usage ;;
     esac	    
 }
 
@@ -53,6 +53,6 @@ if [ "$#" != 0 ]; then
     case "$cmd" in
 	mount) mount-partition "$@" ;; 
 	umount) umount-partition "$@" ;;
-	*) usage
+	*) mount-partition-usage
     esac
 fi
