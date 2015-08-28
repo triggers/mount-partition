@@ -39,6 +39,38 @@ list-partitions()
     "${thecmd[@]}"
 }
 
+partition-info-from-parted()
+{
+    imageFile="$1"
+    partionNumber="$2"
+    parted -s -m "$1" unit B print | (
+	# example output:
+	# BYT;
+	# /media/sdc1/images/win-2012.raw:32212254720B:file:512:512:msdos::;
+	# 1:1048576B:368050175B:367001600B:ntfs::boot;
+	# 2:368050176B:32211206143B:31843155968B:ntfs::;
+	pattern="$partionNumber:*"
+	while read ln; do
+	    if [[ "$ln" == $pattern ]]; then
+		ln="${ln//B/}" # get rid of the B suffixes
+		IFS=: read n start end size fs rest <<<"$ln"
+		echo "$start $size"
+		exit 0 # (partition not found) exit from subshell
+	    fi
+	done
+	echo "Partition number $partionNumber not found" 1>&2
+	exit 1 # (partition not found) exit from subshell
+    )
+}
+
+attach-partition()
+{
+    imageFile="$1"
+    partionNumber="$2"
+    echo "just testing here...."
+    partition-info-from-parted "$imageFile" "$partionNumber"
+}
+
 mount-partition()
 {
     case "$#" in
