@@ -32,6 +32,13 @@ with the remaining arguments.
 EOF
 }
 
+list-partitions()
+{
+    thecmd=( parted "$1" unit B print )
+    echo "Listing partitions with the command: \"${thecmd[*]}\""
+    "${thecmd[@]}"
+}
+
 mount-partition()
 {
     case "$#" in
