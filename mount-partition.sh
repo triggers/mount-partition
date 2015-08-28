@@ -3,8 +3,14 @@
 mount-partition-usage()
 {
     cat <<EOF
+This file is meant to be sourced, and then the functions below
+called directly.
+
 mount-partition disk-image.raw
   # lists the partitions in the image
+
+mount-partition {--force} /path/to/disk-image.raw N
+  # mount partition, but do not mount file system
 
 mount-partition {--force} /path/to/disk-image.raw N /path/to/mount-point
   # mounts partition number N at mount-point
@@ -19,15 +25,34 @@ Information is kept in these 2 files for cleanup and sanity checks:
   /path/to/mount-point.mount-info
   /tmp/mount-partition.info
 
+For debugging, the script can be called with "mount*" or "umount*"
+as the first parameter.  One of the above functions is then called
+with the remaining arguments.
+
 EOF
 }
 
 mount-partition()
 {
-    :
+    case "$#" in
+	1)  list-partitions "$@" ;;
+	2)  attach-partition "$@" ;;
+	3)  mount-partition "$@" ;;
+	*)  usage ;;
+    esac	    
 }
 
-mount-partition()
+umount-partition()
 {
     :
 }
+
+if [ "$#" != 0 ]; then
+    cmd="$1"
+    shift
+    case "$cmd" in
+	mount) mount-partition "$@" ;; 
+	umount) umount-partition "$@" ;;
+	*) usage
+    esac
+fi
