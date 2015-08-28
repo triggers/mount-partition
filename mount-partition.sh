@@ -63,12 +63,42 @@ partition-info-from-parted()
     )
 }
 
+partition-info-from-sfdisk()
+{
+    imageFile="$1"
+    partionNumber="$2"
+    sfdisk -d "$1" | (
+	# example output:
+	# label: dos
+	# label-id: 0x0188d0f2
+	# device: builddirs/friday1/win-2012.raw
+	# unit: sectors
+	# ./win-2012.raw1 : start=        2048, size=      716800, type=7, bootable
+	# ./win-2012.raw2 : start=      718848, size=    62193664, type=7
+	n=0
+	while read ln; do
+	    if [[ "$ln" == *start=*size=* ]]; then
+		n=$(( n + 1 ))
+		if [ "$n" -eq "$partionNumber" ]; then
+		    ln="${ln##*:}"
+		    IFS=', ' read startLabel start sizeLabel size rest <<<"$ln"
+		    echo "$(( 512 * start )) $(( 512 * size ))"
+		    exit 0 # (partition not found) exit from subshell
+		fi
+	    fi
+	done
+	echo "Partition number $partionNumber not found" 1>&2
+	exit 1 # (partition not found) exit from subshell
+    )
+}
+
 attach-partition()
 {
     imageFile="$1"
     partionNumber="$2"
     echo "just testing here...."
     partition-info-from-parted "$imageFile" "$partionNumber"
+    partition-info-from-sfdisk "$imageFile" "$partionNumber"
 }
 
 mount-partition()
