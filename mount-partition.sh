@@ -58,7 +58,7 @@ partition-info-from-parted()
 		exit 0 # (partition not found) exit from subshell
 	    fi
 	done
-	echo "Partition number $partionNumber not found" 1>&2
+	echo "Partition number $partionNumber not found from parted" 1>&2
 	exit 1 # (partition not found) exit from subshell
     )
 }
@@ -87,7 +87,7 @@ partition-info-from-sfdisk()
 		fi
 	    fi
 	done
-	echo "Partition number $partionNumber not found" 1>&2
+	echo "Partition number $partionNumber not found from sfdisk" 1>&2
 	exit 1 # (partition not found) exit from subshell
     )
 }
@@ -96,9 +96,20 @@ attach-partition()
 {
     imageFile="$1"
     partionNumber="$2"
-    echo "just testing here...."
-    partition-info-from-parted "$imageFile" "$partionNumber"
-    partition-info-from-sfdisk "$imageFile" "$partionNumber"
+    pinfo="$(partition-info-from-parted "$imageFile" "$partionNumber")" || exit
+    sinfo="$(partition-info-from-sfdisk "$imageFile" "$partionNumber")" || exit
+    [ "$pinfo" = "$sinfo" ] || {
+	echo "Information parsed from sfdisk and parted do not agree. Exiting." 1>&2
+	exit 1
+    }
+    read start size <<<"$pinfo"
+    loopdev="$(losetup --find --show "$imageFile" -o "$start" --sizelimit "$size")"
+    rc="$?"
+    [ "$rc" = 0 ] && [[ "$loopdev" == /dev/loop* ]] || {
+	echo "Error occured with losetup command (rc=$rc) or output was unexpected ($loopdev)." 1>&2
+	exit 1
+    }
+    echo "$loopdev"
 }
 
 mount-partition()
