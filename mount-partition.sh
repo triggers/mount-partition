@@ -34,7 +34,12 @@ EOF
 
 do-list-partitions()
 {
-    thecmd=( parted "$1" unit B print )
+    imageFile="$1"
+    [ -f "$imageFile" ] || {
+	echo "First parameter must an existing image file. Exiting." 1>&2
+	exit 1
+    }
+    thecmd=( parted "$imageFile" unit B print )
     echo "Listing partitions with the command: \"${thecmd[*]}\""
     "${thecmd[@]}"
 }
@@ -96,6 +101,14 @@ do-attach-partition()
 {
     imageFile="$1"
     partionNumber="$2"
+    [ -f "$imageFile" ] || {
+	echo "First parameter must an existing image file. Exiting." 1>&2
+	exit 1
+    }
+    [ "$partionNumber" != "" ] && [ "${partionNumber//[0-9]/}" = "" ] || {
+	echo "Second parameter must a number. Exiting." 1>&2
+	exit 1
+    }
     pinfo="$(partition-info-from-parted "$imageFile" "$partionNumber")" || exit
     sinfo="$(partition-info-from-sfdisk "$imageFile" "$partionNumber")" || exit
     [ "$pinfo" = "$sinfo" ] || {
