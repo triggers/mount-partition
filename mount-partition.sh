@@ -116,12 +116,19 @@ do-attach-partition()
 	exit 1
     }
     read start size <<<"$pinfo"
-    loopdev="$(losetup --find --show "$imageFile" -o "$start" --sizelimit "$size")"
-    rc="$?"
-    [ "$rc" = 0 ] && [[ "$loopdev" == /dev/loop* ]] || {
-	echo "Error occured with losetup command (rc=$rc) or output was unexpected ($loopdev)." 1>&2
-	exit 1
-    }
+    precheck="$(losetup --associated "$imageFile" --offset "$start")"
+    if [ "$precheck" != "" ]; then
+	loopdev="${precheck%%:*}"
+	echo "Reusing exiting mount:" 1>&2
+	echo "$precheck" 1>&2
+    else
+	loopdev="$(losetup --find --show "$imageFile" -o "$start" --sizelimit "$size")"
+	rc="$?"
+	[ "$rc" = 0 ] && [[ "$loopdev" == /dev/loop* ]] || {
+	    echo "Error occured with losetup command (rc=$rc) or output was unexpected ($loopdev)." 1>&2
+	    exit 1
+	}
+    fi
     echo "$loopdev"
 }
 
