@@ -32,7 +32,7 @@ with the remaining arguments.
 EOF
 }
 
-list-partitions()
+do-list-partitions()
 {
     thecmd=( parted "$1" unit B print )
     echo "Listing partitions with the command: \"${thecmd[*]}\""
@@ -92,7 +92,7 @@ partition-info-from-sfdisk()
     )
 }
 
-attach-partition()
+do-attach-partition()
 {
     imageFile="$1"
     partionNumber="$2"
@@ -112,12 +112,29 @@ attach-partition()
     echo "$loopdev"
 }
 
+do-mount-partition()
+{
+    imageFile="$1"
+    partionNumber="$2"
+    mountPoint="$3"
+    [ -d "$mountPoint" ] && (
+	cd "$mountPoint"
+	shopt -s nullglob
+	[ "$(echo *)" = "" ]
+    ) || {
+	echo "Third parameter must be an existing directory that is empty. Exiting." 1>&2
+	exit 1
+    }
+    loopDev="$(do-attach-partition "$imageFile" "$partionNumber")" || exit
+    mount "$loopDev" "$mountPoint"
+}
+
 mount-partition()
 {
     case "$#" in
-	1)  list-partitions "$@" ;;
-	2)  attach-partition "$@" ;;
-	3)  mount-partition "$@" ;;
+	1)  do-list-partitions "$@" ;;
+	2)  do-attach-partition "$@" ;;
+	3)  do-mount-partition "$@" ;;
 	*)  mount-partition-usage ;;
     esac	    
 }
