@@ -146,7 +146,16 @@ do-mount-partition()
 	exit 1
     }
     loopDev="$(do-attach-partition "$imageFile" "$partionNumber")" || exit
-    mount "$loopDev" "$mountPoint"
+    mounts="$(mount | grep ^"$loopDev")"
+    [ "$mounts" = "" ] || {
+	echo "Exiting without mounting, because the loop device $loopDev is already mounted:" 1>&2
+	echo "$mounts"
+	exit 1
+    }
+    mount "$loopDev" "$mountPoint" || {
+	echo "The mount command failed ($?). $loopDev is still attached to the image file." 1>&2
+	exit 1
+    }
 }
 
 mount-partition()
