@@ -1,29 +1,91 @@
 #!/bin/bash
 
+# What this code does is relatively simple, but worth encapsulating
+# because it is code that must run as root that can be a little
+# confusing and a little dangerous.
+
+# In short, the code mounts a file system from a partition inside an
+# image file. This only requires a few steps: (1) find the location
+# of the partition inside the file, (2) attach that part of the file
+# to a loop block device, (3) mount that loop device to a mount point.
+
+# Other solutions already exist that encapsulate steps (1) and (2),
+# such as: kpart, qemu-nbd, and even recent versions of the Linux
+# kernel itself using just losetup(!).  A mount command with a '-o
+# loop' option encapsulates steps (2) and (3).  (Plus there already
+# have been at least two hacks done locally.)  Unfortunately, all have
+# disadvantages, or we have had unexplained reliability problems with
+# them, and none encapsulates all three steps.  (TODO: expand this
+# paragraph somewhere to explain the disadvantages)
+
+# One thing that perhaps makes such code confusing is that later the
+# mount must be undone, and this requires root, and it is possible
+# that the code will undo a mount of something else running on the OS
+# (or its nested containers).  So it is necessary to keep enough
+# information when mounting to safely unmount and detach everything
+# later.
+
+# An important insight that made the code below simpler is that the
+# losetup command has an "--associated" option that makes it easy to
+# find the loop device mapping a particular partition.  Therefore, if
+# the calling code remembers the path of the image file and the
+# partition number, it is easy find the loop device.  From the loop
+# device, it is easy to find mount points from /proc/mounts.
+
+# To keep things portable, the code below relies only on these commands
+# and options:
+# 
+#     sfdisk -d "$imageFile1"
+#     parted "$imageFile" unit B print
+#     parted -s -m "$imageFile" unit B print
+#     losetup --associated "$imageFile" --offset "$start"
+#     losetup --find --show "$imageFile" --offset "$start" --sizelimit "$size"
+#     mount "$loopDev" "$mountPoint"
+#     umount "$loopDev"
+
+# (A mistake made on the earlier version of the code was to save the
+#  loop device information and use it later.  The problem this raised
+#  was that it is difficult to verify that events outside the
+#  process's control have not made the information invalid.  The the
+#  first attempt to verify only worked with some versions of losetup.
+#  It turned out to be easier to regenerate the loop device
+#  information than to verify that saved information is correct! But
+#  that is only true if regenerating is scripted...as it is below.)
+
 mount-partition-usage()
 {
     cat <<EOF
 This file is meant to be sourced, and then the functions below
 called directly.
 
+MOUNT-PARTITION
+===============
+
 mount-partition disk-image.raw
   # lists the partitions in the image
 
-mount-partition {--force} /path/to/disk-image.raw N
+mount-partition /path/to/disk-image.raw N
   # mount partition, but do not mount file system
 
-mount-partition {--force} /path/to/disk-image.raw N /path/to/mount-point
+mount-partition /path/to/disk-image.raw N /path/to/mount-point
   # mounts partition number N at mount-point
 
-umount-partition {--force} /path/to/disk-image.raw N
-  # or
-umount-partition {--force} /path/to/mount-point
-  # unmounts partition number N
 
-Information is kept in these 2 files for cleanup and sanity checks:
-  /path/to/disk-image.raw.mount-info
-  /path/to/mount-point.mount-info
-  /tmp/mount-partition.info
+UMOUNT-PARTITION
+===============
+
+umount-partition /path/to/disk-image.raw
+  # detach any loop devices for this image after removing any mounts
+
+umount-partition /path/to/disk-image.raw N
+  # detach any loop devices for this partition after removing any mounts
+
+umount-partition /path/to/disk-image.raw N /path/to/mount-point
+  # same as above, but verify that it is mounted to mount-point first as a sanity check
+  # (so multiple processes can safely mount the partition read-only)
+
+umount-partition /path/to/mount-point
+  # unmounts loop device from mount-point and detaches the image file
 
 For debugging, the script can be called with "mount*" or "umount*"
 as the first parameter.  One of the above functions is then called
@@ -122,7 +184,7 @@ do-attach-partition()
 	echo "Reusing exiting mount:" 1>&2
 	echo "$precheck" 1>&2
     else
-	loopdev="$(losetup --find --show "$imageFile" -o "$start" --sizelimit "$size")"
+	loopdev="$(losetup --find --show "$imageFile" --offset "$start" --sizelimit "$size")"
 	rc="$?"
 	[ "$rc" = 0 ] && [[ "$loopdev" == /dev/loop* ]] || {
 	    echo "Error occured with losetup command (rc=$rc) or output was unexpected ($loopdev)." 1>&2
