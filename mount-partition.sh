@@ -94,6 +94,45 @@ with the remaining arguments.
 EOF
 }
 
+get-loop-list-from-imagefile()
+{
+    imageFile="$1"
+    offset="$2"  # optional parameter
+    [ "$offset" != "" ] && offset="--offset $offset"
+    losetup --associated "$imageFile" $offset | \
+	while read ln; do
+	    # assume each line starts with device path followed by a colon
+	    loopdev="${ln%%:*}"
+	    if [[ "$loopdev" == /dev/loop* ]]; then
+		echo "$loopdev"
+	    else
+		echo "Unexpected output from losetup: $ln" 1>&2
+		# don't confuse calling code with unexpected output, so no echo here
+	    fi
+	done
+}
+
+convert-excapes()
+{
+    # Converts octal escapes like those used in /proc/mounts paths.
+    # Using bash's built-in $'string' construct, but first must
+    # change quotes to octal to not close the construct accidentally.
+    step1="${1//\'/\047}"
+    step2="$'${step1}'"
+    eval echo "$step2"
+}
+
+get-mountpoint-list-from-device-list()
+{
+    for device in "$@"; do
+	# For example:
+	# /dev/loop0 /tmp/test/m vfat rw,relatime,fmask=0022,dmask=0022,codepage=850,iocharset=utf8,shortname=mixed,errors=remount-ro 0 0
+	while read adev apath rest; do
+	    [ "$device" = "$adev" ] && convert-excapes "$apath"
+	done </proc/mounts
+    done
+}
+
 do-list-partitions()
 {
     imageFile="$1"
@@ -230,9 +269,33 @@ mount-partition()
     esac	    
 }
 
+do-unmount-image()
+{
+    imageFile="$1"
+    looplist="$(get-loop-list-from-imagefile "$imageFile")"
+    echo lllllllllllllll
+    echo "$looplist"
+    set -x
+    mountlist="$(get-mountpoint-list-from-device-list $looplist)"
+    echo mmmmmmmmmm
+    echo "$mountlist"
+}
+
 umount-partition()
 {
-    :
+    case "$#" in
+	1)
+	    if [ -f "$1" ]; then
+		do-unmount-image "$@"
+	    else
+		do-unmount-mountpoint "$@"
+	    fi
+	    ;;
+	2)  do-unmount-partition "$@" ;;
+	3)  do-mount-partition "$@" ;;
+	*)  mount-partition-usage ;;
+    esac	    
+
 }
 
 if [ "$#" != 0 ]; then
