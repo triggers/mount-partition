@@ -281,7 +281,6 @@ do-unmount-image()
 {
     imageFile="$1"
     offset="$2"  # optional parameter
-    verifyMount="$3"  # optional parameter
     looplist="$(get-loop-list-from-imagefile "$imageFile")"
     mountlist="$(get-mountpoint-list-from-device-list $looplist)"
     if [ "$looplist$mountlist" = "" ]; then
@@ -292,24 +291,14 @@ do-unmount-image()
 	while read aDev aMountPath; do
 	    decoded="$(convert-excapes "$aMountPath")"
 	    echo "Unmounting: $decoded"
-	    if [ "$verifyMount" != "" ]; then
-		v="$(cd "$verifyMount" && pwd -P)" # deal with relative paths, links, etc
-		m="$(cd "$decoded" && pwd -P)"
-		if [ "$v" != "$m" ]; then
-		    echo "Skipping unmount of $aDev $decoded" 1>&2
-		    continue
-		fi
-	    fi
 	    umount "$decoded"
 	done <<<"$mountlist"
 	mountlist2="$(get-mountpoint-list-from-device-list $looplist)"
 	if [ "$mountlist2" != "" ]; then
-	    echo "The following mount points remain:" 1>&2
+	    echo "Stopping because following mount points remain:" 1>&2
 	    echo "$mountlist2" 1>&2
-	    if [ "$verifyMount" = "" ]; then
-		echo "Exiting. No attempt made to detach loop devices." 1>&2
-		exit 1
-	    fi
+	    echo "No loop devices were detached." 1>&2
+	    exit 1
 	fi
     fi
     if [ "$looplist" != "" ]; then
@@ -331,10 +320,9 @@ do-unmount-partition()
 {
     imageFile="$1"
     partionNumber="$2"
-    verifyMount="$3"  # optional parameter
     pinfo="$(get-partition-info "$imageFile" "$partionNumber")" || return
     read start size <<<"$pinfo"
-    do-unmount-image "$imageFile" "$start" "$verifyMount"
+    do-unmount-image "$imageFile" "$start"
 }
 
 umount-partition()
@@ -347,7 +335,8 @@ umount-partition()
 		do-unmount-mountpoint "$@"
 	    fi
 	    ;;
-	2 | 3)  do-unmount-partition "$@" ;;
+	2)  do-unmount-partition "$@" ;;
+	3)  do-mount-partition "$@" ;;
 	*)  mount-partition-usage ;;
     esac	    
 
