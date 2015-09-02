@@ -369,9 +369,15 @@ do-unmount-partition-verify()
 	echo "Detaching: $i"
 	losetup -d "$i"
     done
+    report-missed-detaches || return
+    return 0
+}
+
+report-missed-detaches()
+{
     missed="$(
 	all="$(losetup -a)"
-	for i in $toDetach; do
+	for i in "$@"; do
 	    grep "^$i:" <<<"$all"
 	done )"
     if [ "$missed" != "" ]; then
@@ -379,7 +385,42 @@ do-unmount-partition-verify()
 	echo "$missed" 1>&2
 	return 1
     fi
-    return 0
+}
+
+get-device-from-mount-point()
+{
+    mountPoint="$1"
+    mabsolute="$(cd "$mountPoint" && pwd -P)" || return # deal with relative paths, links, etc
+    while read adev apath rest; do
+	[[ "$adev" == /dev/loop* ]] || continue
+	decoded="$(convert-excapes "$apath")"
+	dabsolute="$(cd "$decoded" 2>/dev/null && pwd -P)"
+	if [ "$mabsolute" = "$dabsolute" ]; then
+	    echo "$adev"
+	    break
+	fi
+    done </proc/mounts
+}
+
+do-unmount-mountpoint()
+{
+    mountPoint="$1"
+    loopdev="$(get-device-from-mount-point "$mountPoint")"
+    if [ "$loopdev" = "" ]; then
+	echo "Not mounted to loop device. Nothing to do." 1>&2
+	return 1
+    fi
+
+    echo "Unmounting: $mountPoint"
+    umount "$mountPoint"
+    check="$(get-device-from-mount-point "$mountPoint")"
+    if [ "$check" != "" ]; then
+	echo "Unmount failed" 1>&2
+	return 1
+    fi
+    echo "Detaching: $loopdev"
+    losetup -d "$loopdev"
+    report-missed-detaches "$loopdev"
 }
 
 umount-partition()
