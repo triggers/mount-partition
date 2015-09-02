@@ -325,6 +325,14 @@ do-unmount-partition()
     do-unmount-image "$imageFile" "$start"
 }
 
+do-unmount-partition-verify()
+{
+    imageFile="$1"
+    partionNumber="$2"
+    verifyMount="$3"
+    echo TODO
+}
+
 umount-partition()
 {
     case "$#" in
@@ -336,7 +344,7 @@ umount-partition()
 	    fi
 	    ;;
 	2)  do-unmount-partition "$@" ;;
-	3)  do-mount-partition "$@" ;;
+	3)  do-unmount-partition-verify "$@" ;;
 	*)  mount-partition-usage ;;
     esac	    
 
