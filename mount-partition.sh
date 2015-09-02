@@ -140,7 +140,7 @@ do-list-partitions()
     imageFile="$1"
     [ -f "$imageFile" ] || {
 	echo "First parameter must an existing image file. Exiting." 1>&2
-	exit 1
+	return 1
     }
     thecmd=( parted "$imageFile" unit B print )
     echo "Listing partitions with the command: \"${thecmd[*]}\""
@@ -213,17 +213,17 @@ get-partition-info()
     partionNumber="$2"
     [ -f "$imageFile" ] || {
 	echo "First parameter must an existing image file. Exiting." 1>&2
-	exit 1
+	return 1
     }
     [ "$partionNumber" != "" ] && [ "${partionNumber//[0-9]/}" = "" ] || {
 	echo "Second parameter must a number. Exiting." 1>&2
-	exit 1
+	return 1
     }
-    pinfo="$(partition-info-from-parted "$imageFile" "$partionNumber")" || exit
-    sinfo="$(partition-info-from-sfdisk "$imageFile" "$partionNumber")" || exit
+    pinfo="$(partition-info-from-parted "$imageFile" "$partionNumber")" || return
+    sinfo="$(partition-info-from-sfdisk "$imageFile" "$partionNumber")" || return
     [ "$pinfo" = "$sinfo" ] || {
 	echo "Information parsed from sfdisk and parted do not agree. Exiting." 1>&2
-	exit 1
+	return 1
     }
     echo "$pinfo"
 }
@@ -244,7 +244,7 @@ do-attach-partition()
 	rc="$?"
 	[ "$rc" = 0 ] && [[ "$loopdev" == /dev/loop* ]] || {
 	    echo "Error occured with losetup command (rc=$rc) or output was unexpected ($loopdev)." 1>&2
-	    exit 1
+	    return 1
 	}
     fi
     echo "$loopdev"
@@ -261,18 +261,18 @@ do-mount-partition()
 	[ "$(echo *)" = "" ]
     ) || {
 	echo "Third parameter must be an existing directory that is empty. Exiting." 1>&2
-	exit 1
+	return 1
     }
-    loopDev="$(do-attach-partition "$imageFile" "$partionNumber")" || exit
+    loopDev="$(do-attach-partition "$imageFile" "$partionNumber")" || return
     mounts="$(mount | grep ^"$loopDev")"
     [ "$mounts" = "" ] || {
 	echo "Exiting without mounting, because the loop device $loopDev is already mounted:" 1>&2
 	echo "$mounts"
-	exit 1
+	return 1
     }
     mount "$loopDev" "$mountPoint" || {
 	echo "The mount command failed ($?). $loopDev is still attached to the image file." 1>&2
-	exit 1
+	return 1
     }
 }
 
@@ -294,7 +294,7 @@ do-unmount-image()
     mountlist="$(get-mountpoint-list-from-device-list $looplist)"
     if [ "$looplist$mountlist" = "" ]; then
 	echo "Nothing to do." 1>&2
-	exit 1
+	return 1
     fi
     if [ "$mountlist" != "" ]; then
 	while read aDev aMountPath; do
@@ -307,7 +307,7 @@ do-unmount-image()
 	    echo "Stopping because following mount points remain:" 1>&2
 	    echo "$mountlist2" 1>&2
 	    echo "No loop devices were detached." 1>&2
-	    exit 1
+	    return 1
 	fi
     fi
     if [ "$looplist" != "" ]; then
@@ -319,7 +319,7 @@ do-unmount-image()
 	if [ "$looplist2" != "" ]; then
 	    echo "The following loop devices could not be detached:" 1>&2
 	    echo "$looplist2" 1>&2
-	    exit 1
+	    return 1
 	fi
     fi
     return 0
@@ -351,7 +351,7 @@ do-unmount-partition-verify()
 	    echo "Note the following attached loop devices remain:" 1>&2
 	    echo "$looplist"
 	fi
-	exit 1
+	return 1
     fi
     toDetach=""
     while read aDev aMountPath; do
@@ -377,7 +377,7 @@ do-unmount-partition-verify()
     if [ "$missed" != "" ]; then
 	echo "Detaching failed for the following:" 1>&2
 	echo "$missed" 1>&2
-	exit 1
+	return 1
     fi
     return 0
 }
