@@ -369,6 +369,17 @@ do-unmount-partition-verify()
 	echo "Detaching: $i"
 	losetup -d "$i"
     done
+    missed="$(
+	all="$(losetup -a)"
+	for i in $toDetach; do
+	    grep "^$i:" <<<"$all"
+	done )"
+    if [ "$missed" != "" ]; then
+	echo "Detaching failed for the following:" 1>&2
+	echo "$missed" 1>&2
+	exit 1
+    fi
+    return 0
 }
 
 umount-partition()
