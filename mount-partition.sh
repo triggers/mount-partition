@@ -128,7 +128,7 @@ get-mountpoint-list-from-device-list()
 	# For example:
 	# /dev/loop0 /tmp/test/m vfat rw,relatime,fmask=0022,dmask=0022,codepage=850,iocharset=utf8,shortname=mixed,errors=remount-ro 0 0
 	while read adev apath rest; do
-	    [ "$device" = "$adev" ] && convert-excapes "$apath"
+	    [ "$device" = "$adev" ] && echo "$adev $apath"
 	done </proc/mounts
     done
 }
@@ -273,12 +273,38 @@ do-unmount-image()
 {
     imageFile="$1"
     looplist="$(get-loop-list-from-imagefile "$imageFile")"
-    echo lllllllllllllll
-    echo "$looplist"
-    set -x
     mountlist="$(get-mountpoint-list-from-device-list $looplist)"
-    echo mmmmmmmmmm
-    echo "$mountlist"
+    if [ "$looplist$mountlist" = "" ]; then
+	echo "Nothing to do." 1>&2
+	exit 1
+    fi
+    if [ "$mountlist" != "" ]; then
+	while read aDev aMountPath; do
+	    decoded="$(convert-excapes "$aMountPath")"
+	    echo "Unmounting: $decoded"
+	    umount "$decoded"
+	done <<<"$mountlist"
+	mountlist2="$(get-mountpoint-list-from-device-list $looplist)"
+	if [ "$mountlist2" != "" ]; then
+	    echo "Stopping because following mount points remain:" 1>&2
+	    echo "$mountlist2" 1>&2
+	    echo "No loop devices were detached." 1>&2
+	    exit 1
+	fi
+    fi
+    if [ "$looplist" != "" ]; then
+	for i in $looplist; do
+	    echo "Detaching: $i"
+	    losetup -d "$i"
+	done
+	looplist2="$(get-loop-list-from-imagefile "$imageFile")"
+	if [ "$looplist2" != "" ]; then
+	    echo "The following loop devices could not be detached:" 1>&2
+	    echo "$looplist2" 1>&2
+	    exit 1
+	fi
+    fi
+    return 0
 }
 
 umount-partition()
