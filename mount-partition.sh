@@ -34,7 +34,7 @@
 
 # To keep things portable, the code below relies only on these commands
 # and options:
-# 
+#
 #     sfdisk -d "$imageFile1"
 #     parted "$imageFile" unit B print
 #     parted -s -m "$imageFile" unit B print
@@ -274,7 +274,7 @@ mount-partition()
 	2)  do-attach-partition "$@" ;;
 	3)  do-mount-partition "$@" ;;
 	*)  mount-partition-usage ;;
-    esac	    
+    esac
 }
 
 do-unmount-image()
@@ -331,7 +331,7 @@ do-unmount-partition-verify()
     partionNumber="$2"
     verifyMount="$3"
     vabsolute="$(cd "$verifyMount" && pwd -P)" # deal with relative paths, links, etc
-    
+
     pinfo="$(get-partition-info "$imageFile" "$partionNumber")" || return
     read start size <<<"$pinfo"
     looplist="$(get-loop-list-from-imagefile "$imageFile" "$start")"
@@ -375,7 +375,7 @@ umount-partition()
 	2)  do-unmount-partition "$@" ;;
 	3)  do-unmount-partition-verify "$@" ;;
 	*)  mount-partition-usage ;;
-    esac	    
+    esac
 
 }
 
@@ -383,7 +383,7 @@ if [ "$#" != 0 ]; then
     cmd="$1"
     shift
     case "$cmd" in
-	mount) mount-partition "$@" ;; 
+	mount) mount-partition "$@" ;;
 	umount) umount-partition "$@" ;;
 	*) mount-partition-usage
     esac
