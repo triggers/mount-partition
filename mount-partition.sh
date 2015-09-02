@@ -264,12 +264,16 @@ do-mount-partition()
 	return 1
     }
     loopDev="$(do-attach-partition "$imageFile" "$partionNumber")" || return
-    mounts="$(mount | grep ^"$loopDev ")" # space in pattern so loop1 does not match loop10
-    [ "$mounts" = "" ] || {
-	echo "Exiting without mounting, because the loop device $loopDev is already mounted:" 1>&2
-	echo "$mounts"
-	return 1
-    }
+    # Not sure what to do here, so now it is possible to do "export MultipleMounts=OK" and
+    # mount the same loop twice,  which is OK with Linux.
+    if [ "$MultipleMounts" = "" ]; then
+	mounts="$(mount | grep ^"$loopDev ")" # space in pattern so loop1 does not match loop10
+	[ "$mounts" = "" ] || {
+	    echo "Exiting without mounting, because the loop device $loopDev is already mounted:" 1>&2
+	    echo "$mounts"
+	    return 1
+	}
+    fi
     mount "$loopDev" "$mountPoint" || {
 	echo "The mount command failed ($?). $loopDev is still attached to the image file." 1>&2
 	return 1
