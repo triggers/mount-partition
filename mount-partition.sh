@@ -38,8 +38,10 @@
 #     sfdisk -d "$imageFile1"
 #     parted "$imageFile" unit B print
 #     parted -s -m "$imageFile" unit B print
+#     losetup --associated "$imageFile"
 #     losetup --associated "$imageFile" --offset "$start"
 #     losetup --find --show "$imageFile" --offset "$start" --sizelimit "$size"
+#     losetup -d "$loopDevice"
 #     mount "$loopDev" "$mountPoint"
 #     umount "$loopDev"
 
@@ -200,6 +202,13 @@ partition-info-from-sfdisk()
 
 get-partition-info()
 {
+    # The offset information is critical and getting it wrong could
+    # cause data loss.  Reading the documentation of commands like
+    # sfdisk, parted, fdisk, etc is a little scary.  For example,
+    # sfdisk "not designed for large partitions".  How large?  Does
+    # not say.  Therefore, in an effort to make the code safer, both
+    # sfdisk and parted are used and their results confirmed to match
+    # before proceeding.
     imageFile="$1"
     partionNumber="$2"
     [ -f "$imageFile" ] || {
