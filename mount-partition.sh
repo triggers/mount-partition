@@ -164,7 +164,7 @@ partition-info-from-parted()
 		exit 0 # (partition not found) exit from subshell
 	    fi
 	done
-	echo "Partition number $partionNumber not found from parted" 1>&2
+	echo "Partition number $partionNumber not found in output from parted" 1>&2
 	exit 1 # (partition not found) exit from subshell
     )
 }
@@ -193,12 +193,12 @@ partition-info-from-sfdisk()
 		fi
 	    fi
 	done
-	echo "Partition number $partionNumber not found from sfdisk" 1>&2
+	echo "Partition number $partionNumber not found in output from sfdisk" 1>&2
 	exit 1 # (partition not found) exit from subshell
     )
 }
 
-do-attach-partition()
+get-partition-info()
 {
     imageFile="$1"
     partionNumber="$2"
@@ -216,6 +216,14 @@ do-attach-partition()
 	echo "Information parsed from sfdisk and parted do not agree. Exiting." 1>&2
 	exit 1
     }
+    echo "$pinfo"
+}
+
+do-attach-partition()
+{
+    imageFile="$1"
+    partionNumber="$2"
+    pinfo="$(get-partition-info "$imageFile" "$partionNumber")" || return
     read start size <<<"$pinfo"
     precheck="$(losetup --associated "$imageFile" --offset "$start")"
     if [ "$precheck" != "" ]; then
@@ -272,6 +280,7 @@ mount-partition()
 do-unmount-image()
 {
     imageFile="$1"
+    offset="$2"  # optional parameter
     looplist="$(get-loop-list-from-imagefile "$imageFile")"
     mountlist="$(get-mountpoint-list-from-device-list $looplist)"
     if [ "$looplist$mountlist" = "" ]; then
@@ -305,6 +314,15 @@ do-unmount-image()
 	fi
     fi
     return 0
+}
+
+do-unmount-partition()
+{
+    imageFile="$1"
+    partionNumber="$2"
+    pinfo="$(get-partition-info "$imageFile" "$partionNumber")" || return
+    read start size <<<"$pinfo"
+    do-unmount-image "$imageFile" "$start"
 }
 
 umount-partition()
