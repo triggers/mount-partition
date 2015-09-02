@@ -264,7 +264,7 @@ do-mount-partition()
 	return 1
     }
     loopDev="$(do-attach-partition "$imageFile" "$partionNumber")" || return
-    mounts="$(mount | grep ^"$loopDev")"
+    mounts="$(mount | grep ^"$loopDev ")" # space in pattern so loop1 does not match loop10
     [ "$mounts" = "" ] || {
 	echo "Exiting without mounting, because the loop device $loopDev is already mounted:" 1>&2
 	echo "$mounts"
