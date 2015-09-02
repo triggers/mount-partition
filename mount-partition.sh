@@ -330,7 +330,36 @@ do-unmount-partition-verify()
     imageFile="$1"
     partionNumber="$2"
     verifyMount="$3"
-    echo TODO
+    vabsolute="$(cd "$verifyMount" && pwd -P)" # deal with relative paths, links, etc
+    
+    pinfo="$(get-partition-info "$imageFile" "$partionNumber")" || return
+    read start size <<<"$pinfo"
+    looplist="$(get-loop-list-from-imagefile "$imageFile" "$start")"
+    mountlist="$(get-mountpoint-list-from-device-list $looplist)"
+    if [ "$mountlist" = "" ]; then
+	echo "Nothing to do." 1>&2
+	if [ "$looplist" != "" ]; then
+	    echo "Note the following attached loop devices remain:" 1>&2
+	    echo "$looplist"
+	fi
+	exit 1
+    fi
+    toDetach=""
+    while read aDev aMountPath; do
+	decoded="$(convert-excapes "$aMountPath")"
+	dabsolute="$(cd "$decoded" && pwd -P)"
+	if [ "$vabsolute" != "$dabsolute" ]; then
+	    echo "Skipping unmount of $aDev $decoded" 1>&2
+	    continue
+	fi
+	toDetach="$toDetach $aDev"
+	echo "Unmounting: $decoded"
+	umount "$decoded"
+    done <<<"$mountlist"
+    for i in $toDetach; do
+	echo "Detaching: $i"
+	losetup -d "$i"
+    done
 }
 
 umount-partition()
