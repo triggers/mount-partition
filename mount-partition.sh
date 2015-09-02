@@ -281,7 +281,7 @@ do-unmount-image()
 {
     imageFile="$1"
     offset="$2"  # optional parameter
-    looplist="$(get-loop-list-from-imagefile "$imageFile")"
+    looplist="$(get-loop-list-from-imagefile "$imageFile" "$offset")"
     mountlist="$(get-mountpoint-list-from-device-list $looplist)"
     if [ "$looplist$mountlist" = "" ]; then
 	echo "Nothing to do." 1>&2
@@ -306,7 +306,7 @@ do-unmount-image()
 	    echo "Detaching: $i"
 	    losetup -d "$i"
 	done
-	looplist2="$(get-loop-list-from-imagefile "$imageFile")"
+	looplist2="$(get-loop-list-from-imagefile "$imageFile" "$offset")"
 	if [ "$looplist2" != "" ]; then
 	    echo "The following loop devices could not be detached:" 1>&2
 	    echo "$looplist2" 1>&2
