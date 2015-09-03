@@ -71,6 +71,7 @@ mount-partition /path/to/disk-image.raw N
 
 mount-partition /path/to/disk-image.raw N /path/to/mount-point
   # mounts partition number N at mount-point
+  # -o 'mount,options,such,as,ro' can be appended to set mount options
 
 
 UMOUNT-PARTITION
@@ -274,7 +275,7 @@ do-mount-partition()
 	    return 1
 	}
     fi
-    mount "$loopDev" "$mountPoint" || {
+    mount "$loopDev" "$mountPoint" $MOUNTOPTIONS || {
 	echo "The mount command failed ($?). $loopDev is still attached to the image file." 1>&2
 	return 1
     }
@@ -417,31 +418,53 @@ do-unmount-mountpoint()
     report-missed-detaches "$loopdev"
 }
 
+parse-mpparams()
+{
+    mpparams=( )
+    for p in "$@"; do
+	case "$p" in
+	    -o) MOUNTOPTIONS="-o" ;;
+	    *)
+		if [ "$MOUNTOPTIONS" = "-o" ]; then
+		    MOUNTOPTIONS="-o $p"
+		else
+		    mpparams=( "${mpparams[@]}" "$p" )
+		fi
+		;;
+	esac
+    done
+}
+
 mount-partition()
 {
-    case "$#" in
-	1)  do-list-partitions "$@" ;;
-	2)  do-attach-partition "$@" ;;
-	3)  do-mount-partition "$@" ;;
-	*)  mount-partition-usage ;;
-    esac
+    ( # subshell to keep options set by parameters local
+	parse-mpparams "$@"
+	case "${#mpparams[@]}" in
+	    1)  do-list-partitions "${mpparams[@]}" ;;
+	    2)  do-attach-partition "${mpparams[@]}" ;;
+	    3)  do-mount-partition "${mpparams[@]}" ;;
+	    *)  mount-partition-usage ;;
+	esac
+    )
 }
 
 umount-partition()
 {
-    case "$#" in
-	1)
-	    if [ -f "$1" ]; then
-		do-unmount-image "$@"
-	    else
-		do-unmount-mountpoint "$@"
-	    fi
-	    ;;
-	2)  do-unmount-partition "$@" ;;
-	3)  do-unmount-partition-verify "$@" ;;
-	*)  mount-partition-usage ;;
-    esac
-
+    ( # subshell to keep options set by parameters local
+	parse-mpparams "$@"
+	case "${#mpparams[@]}" in
+	    1)
+		if [ -f "$1" ]; then
+		    do-unmount-image "${mpparams[@]}"
+		else
+		    do-unmount-mountpoint "${mpparams[@]}"
+		fi
+		;;
+	    2)  do-unmount-partition "${mpparams[@]}" ;;
+	    3)  do-unmount-partition-verify "${mpparams[@]}" ;;
+	    *)  mount-partition-usage ;;
+	esac
+    )
 }
 
 if [ "$#" != 0 ]; then
