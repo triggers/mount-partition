@@ -276,6 +276,7 @@ do-mount-partition()
 	mounts="$(grep ^"$loopDev " </proc/mounts)" # space in pattern so loop1 does not match loop10
 	[ "$mounts" = "" ] || {
 	    echo "Exiting without mounting, because the loop device $loopDev is already mounted:" 1>&2
+	    echo "(Add -multi as a parameter to allow multiple mounts)" 1>&2
 	    echo "$mounts"
 	    return 1
 	}
@@ -430,6 +431,7 @@ parse-mpparams()
 	case "$p" in
 	    -o) MOUNTOPTIONS="-o" ;;
 	    -sudo | --sudo) USESUDO=sudo ;;
+	    -multi | --multi) MultipleMounts=OK ;;
 	    *)
 		if [ "$MOUNTOPTIONS" = "-o" ]; then
 		    MOUNTOPTIONS="-o $p"
