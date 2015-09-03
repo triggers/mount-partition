@@ -90,9 +90,14 @@ umount-partition /path/to/disk-image.raw N /path/to/mount-point
 umount-partition /path/to/mount-point
   # unmounts loop device from mount-point and detaches the image file
 
-For debugging, the script can be called with "mount*" or "umount*"
-as the first parameter.  One of the above functions is then called
-with the remaining arguments.
+Since the above are bash functions, sudo will not work.  Therefore,
+--sudo can be appended to any of the above to have the functions
+insert a call to sudo for commands that need it.
+
+When easier, the file can also be used as a script with "mount" or
+"umount" as the first parameter.  One of the above functions is then
+called with the remaining arguments.  In this case, normal sudo will
+work.
 
 EOF
 }
@@ -102,7 +107,7 @@ get-loop-list-from-imagefile()
     imageFile="$1"
     offset="$2"  # optional parameter
     [ "$offset" != "" ] && offset="--offset $offset"
-    losetup --associated "$imageFile" $offset | \
+    $USESUDO losetup --associated "$imageFile" $offset | \
 	while read ln; do
 	    # assume each line starts with device path followed by a colon
 	    loopdev="${ln%%:*}"
@@ -235,13 +240,13 @@ do-attach-partition()
     partionNumber="$2"
     pinfo="$(get-partition-info "$imageFile" "$partionNumber")" || return
     read start size <<<"$pinfo"
-    precheck="$(losetup --associated "$imageFile" --offset "$start")"
+    precheck="$($USESUDO losetup --associated "$imageFile" --offset "$start")"
     if [ "$precheck" != "" ]; then
 	loopdev="${precheck%%:*}"
 	echo "Reusing exiting mount:" 1>&2
 	echo "$precheck" 1>&2
     else
-	loopdev="$(losetup --find --show "$imageFile" --offset "$start" --sizelimit "$size")"
+	loopdev="$($USESUDO losetup --find --show "$imageFile" --offset "$start" --sizelimit "$size")"
 	rc="$?"
 	[ "$rc" = 0 ] && [[ "$loopdev" == /dev/loop* ]] || {
 	    echo "Error occured with losetup command (rc=$rc) or output was unexpected ($loopdev)." 1>&2
@@ -268,14 +273,14 @@ do-mount-partition()
     # Not sure what to do here, so now it is possible to do "export MultipleMounts=OK" and
     # mount the same loop twice,  which is OK with Linux.
     if [ "$MultipleMounts" = "" ]; then
-	mounts="$(mount | grep ^"$loopDev ")" # space in pattern so loop1 does not match loop10
+	mounts="$(grep ^"$loopDev " </proc/mounts)" # space in pattern so loop1 does not match loop10
 	[ "$mounts" = "" ] || {
 	    echo "Exiting without mounting, because the loop device $loopDev is already mounted:" 1>&2
 	    echo "$mounts"
 	    return 1
 	}
     fi
-    mount "$loopDev" "$mountPoint" $MOUNTOPTIONS || {
+    $USESUDO mount "$loopDev" "$mountPoint" $MOUNTOPTIONS || {
 	echo "The mount command failed ($?). $loopDev is still attached to the image file." 1>&2
 	return 1
     }
@@ -295,7 +300,7 @@ do-unmount-image()
 	while read aDev aMountPath; do
 	    decoded="$(convert-excapes "$aMountPath")"
 	    echo "Unmounting: $decoded"
-	    umount "$decoded"
+	    $USESUDO umount "$decoded"
 	done <<<"$mountlist"
 	mountlist2="$(get-mountpoint-list-from-device-list $looplist)"
 	if [ "$mountlist2" != "" ]; then
@@ -308,7 +313,7 @@ do-unmount-image()
     if [ "$looplist" != "" ]; then
 	for i in $looplist; do
 	    echo "Detaching: $i"
-	    losetup -d "$i"
+	    $USESUDO losetup -d "$i"
 	done
 	looplist2="$(get-loop-list-from-imagefile "$imageFile" "$offset")"
 	if [ "$looplist2" != "" ]; then
@@ -358,11 +363,11 @@ do-unmount-partition-verify()
 	fi
 	toDetach="$toDetach $aDev"
 	echo "Unmounting: $decoded"
-	umount "$decoded"
+	$USESUDO umount "$decoded"
     done <<<"$mountlist"
     for i in $toDetach; do
 	echo "Detaching: $i"
-	losetup -d "$i"
+	$USESUDO losetup -d "$i"
     done
     report-missed-detaches || return
     return 0
@@ -371,7 +376,7 @@ do-unmount-partition-verify()
 report-missed-detaches()
 {
     missed="$(
-	all="$(losetup -a)"
+	all="$($USESUDO losetup -a)"
 	for i in "$@"; do
 	    grep "^$i:" <<<"$all"
 	done )"
@@ -407,14 +412,14 @@ do-unmount-mountpoint()
     fi
 
     echo "Unmounting: $mountPoint"
-    umount "$mountPoint"
+    $USESUDO umount "$mountPoint"
     check="$(get-device-from-mount-point "$mountPoint")"
     if [ "$check" != "" ]; then
 	echo "Unmount failed" 1>&2
 	return 1
     fi
     echo "Detaching: $loopdev"
-    losetup -d "$loopdev"
+    $USESUDO losetup -d "$loopdev"
     report-missed-detaches "$loopdev"
 }
 
@@ -424,6 +429,7 @@ parse-mpparams()
     for p in "$@"; do
 	case "$p" in
 	    -o) MOUNTOPTIONS="-o" ;;
+	    -sudo | --sudo) USESUDO=sudo ;;
 	    *)
 		if [ "$MOUNTOPTIONS" = "-o" ]; then
 		    MOUNTOPTIONS="-o $p"
