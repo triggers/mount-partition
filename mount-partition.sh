@@ -280,16 +280,6 @@ do-mount-partition()
     }
 }
 
-mount-partition()
-{
-    case "$#" in
-	1)  do-list-partitions "$@" ;;
-	2)  do-attach-partition "$@" ;;
-	3)  do-mount-partition "$@" ;;
-	*)  mount-partition-usage ;;
-    esac
-}
-
 do-unmount-image()
 {
     imageFile="$1"
@@ -425,6 +415,16 @@ do-unmount-mountpoint()
     echo "Detaching: $loopdev"
     losetup -d "$loopdev"
     report-missed-detaches "$loopdev"
+}
+
+mount-partition()
+{
+    case "$#" in
+	1)  do-list-partitions "$@" ;;
+	2)  do-attach-partition "$@" ;;
+	3)  do-mount-partition "$@" ;;
+	*)  mount-partition-usage ;;
+    esac
 }
 
 umount-partition()
