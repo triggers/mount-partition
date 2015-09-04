@@ -58,7 +58,8 @@ mount-partition-usage()
 {
     cat <<EOF
 This file is meant to be sourced, and then the functions below
-called directly.
+called directly.  When sourced, the keyword "load" must
+be the first parameter, e.g.: "source ./mount-partition.sh load"
 
 MOUNT-PARTITION
 ===============
@@ -475,12 +476,14 @@ umount-partition()
     )
 }
 
-if [ "$#" != 0 ]; then
-    cmd="$1"
-    shift
-    case "$cmd" in
-	mount) mount-partition "$@" ;;
-	umount) umount-partition "$@" ;;
-	*) mount-partition-usage
-    esac
-fi
+# When sourcing this script's functions into another script, the
+# "load" parameter is needed to hide the calling scripts's parameters
+# from the code below.
+cmd="$1"
+shift
+case "$cmd" in
+    mount*) mount-partition "$@" ;;
+    umount*) umount-partition "$@" ;;
+    load) : ;;
+    *) mount-partition-usage
+esac
